@@ -1,7 +1,8 @@
-//! Input handling — vim-style keyboard navigation.
+//! Input handling -- vim-style keyboard navigation.
 //!
 //! Dispatches madori `AppEvent::Key` events to the appropriate action
 //! based on the current view mode (Normal, ServerList, Map).
+//! Uses awase types for hotkey representation and parsing.
 
 use crate::render::ViewMode;
 use madori::event::KeyCode;
@@ -49,6 +50,82 @@ pub enum Action {
     NextView,
     /// No action.
     None,
+}
+
+/// Convert a madori key event to an awase `Hotkey` (when possible).
+///
+/// Provides a bridge between madori's input events and awase's hotkey
+/// system, enabling user-configurable keybindings via awase's
+/// `Hotkey::parse()` format (e.g., `"cmd+q"`, `"ctrl+d"`).
+#[must_use]
+pub fn to_awase_hotkey(
+    key: &KeyCode,
+    modifiers: &madori::event::Modifiers,
+) -> Option<awase::Hotkey> {
+    let awase_key = madori_key_to_awase(key)?;
+    let mut mods = awase::Modifiers::NONE;
+    if modifiers.shift {
+        mods |= awase::Modifiers::SHIFT;
+    }
+    if modifiers.ctrl {
+        mods |= awase::Modifiers::CTRL;
+    }
+    if modifiers.alt {
+        mods |= awase::Modifiers::ALT;
+    }
+    if modifiers.meta {
+        mods |= awase::Modifiers::CMD;
+    }
+    Some(awase::Hotkey::new(mods, awase_key))
+}
+
+/// Map a madori `KeyCode` to an awase `Key`.
+fn madori_key_to_awase(key: &KeyCode) -> Option<awase::Key> {
+    match key {
+        KeyCode::Char(c) => match c.to_ascii_lowercase() {
+            'a' => Some(awase::Key::A), 'b' => Some(awase::Key::B),
+            'c' => Some(awase::Key::C), 'd' => Some(awase::Key::D),
+            'e' => Some(awase::Key::E), 'f' => Some(awase::Key::F),
+            'g' => Some(awase::Key::G), 'h' => Some(awase::Key::H),
+            'i' => Some(awase::Key::I), 'j' => Some(awase::Key::J),
+            'k' => Some(awase::Key::K), 'l' => Some(awase::Key::L),
+            'm' => Some(awase::Key::M), 'n' => Some(awase::Key::N),
+            'o' => Some(awase::Key::O), 'p' => Some(awase::Key::P),
+            'q' => Some(awase::Key::Q), 'r' => Some(awase::Key::R),
+            's' => Some(awase::Key::S), 't' => Some(awase::Key::T),
+            'u' => Some(awase::Key::U), 'v' => Some(awase::Key::V),
+            'w' => Some(awase::Key::W), 'x' => Some(awase::Key::X),
+            'y' => Some(awase::Key::Y), 'z' => Some(awase::Key::Z),
+            _ => None,
+        },
+        KeyCode::Space => Some(awase::Key::Space),
+        KeyCode::Enter => Some(awase::Key::Return),
+        KeyCode::Escape => Some(awase::Key::Escape),
+        KeyCode::Tab => Some(awase::Key::Tab),
+        KeyCode::Backspace => Some(awase::Key::Backspace),
+        KeyCode::Up => Some(awase::Key::Up),
+        KeyCode::Down => Some(awase::Key::Down),
+        KeyCode::Left => Some(awase::Key::Left),
+        KeyCode::Right => Some(awase::Key::Right),
+        _ => None,
+    }
+}
+
+/// Check if a key event matches an awase hotkey string.
+///
+/// Enables config-driven keybinding lookups.
+#[must_use]
+pub fn matches_hotkey(
+    key: &KeyCode,
+    modifiers: &madori::event::Modifiers,
+    hotkey_str: &str,
+) -> bool {
+    let Some(event_hk) = to_awase_hotkey(key, modifiers) else {
+        return false;
+    };
+    awase::Hotkey::parse(hotkey_str)
+        .map(|parsed| parsed == event_hk)
+        .unwrap_or(false)
 }
 
 /// Map a key event to an action based on the current view mode.
@@ -310,5 +387,48 @@ mod tests {
     fn status_m_switches_to_map() {
         let action = map_key(&KeyCode::Char('m'), true, &no_mods(), &None, &ViewMode::Status);
         assert_eq!(action, Action::SwitchToMap);
+    }
+
+    // -- awase integration tests --
+
+    #[test]
+    fn to_awase_hotkey_converts_char() {
+        let hk = to_awase_hotkey(&KeyCode::Char('j'), &no_mods()).unwrap();
+        assert_eq!(hk.key, awase::Key::J);
+        assert!(hk.modifiers.is_empty());
+    }
+
+    #[test]
+    fn to_awase_hotkey_with_shift() {
+        let mods = madori::event::Modifiers {
+            shift: true,
+            ..Default::default()
+        };
+        let hk = to_awase_hotkey(&KeyCode::Char('J'), &mods).unwrap();
+        assert_eq!(hk.key, awase::Key::J);
+        assert!(hk.modifiers.contains(awase::Modifiers::SHIFT));
+    }
+
+    #[test]
+    fn matches_hotkey_basic() {
+        assert!(matches_hotkey(&KeyCode::Char('q'), &no_mods(), "q"));
+        assert!(!matches_hotkey(&KeyCode::Char('q'), &no_mods(), "w"));
+    }
+
+    #[test]
+    fn matches_hotkey_with_modifier() {
+        let mods = madori::event::Modifiers {
+            ctrl: true,
+            ..Default::default()
+        };
+        assert!(matches_hotkey(&KeyCode::Char('d'), &mods, "ctrl+d"));
+        assert!(!matches_hotkey(&KeyCode::Char('d'), &mods, "d"));
+    }
+
+    #[test]
+    fn awase_hotkey_parse_roundtrip() {
+        let hk = awase::Hotkey::parse("cmd+q").unwrap();
+        assert_eq!(hk.modifiers, awase::Modifiers::CMD);
+        assert_eq!(hk.key, awase::Key::Q);
     }
 }

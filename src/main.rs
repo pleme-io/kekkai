@@ -13,6 +13,7 @@ mod connection;
 mod input;
 mod mcp;
 mod render;
+mod scripting;
 mod servers;
 
 use api::VpnBackend;
