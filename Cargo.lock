@@ -1824,6 +1824,8 @@ dependencies = [
  "madori",
  "pollster",
  "reqwest",
+ "rmcp",
+ "schemars 0.8.22",
  "serde",
  "serde_json",
  "shikumi",

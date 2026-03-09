@@ -11,6 +11,7 @@ mod api;
 mod config;
 mod connection;
 mod input;
+mod mcp;
 mod render;
 mod servers;
 
@@ -51,6 +52,8 @@ enum Commands {
         #[arg(short, long, default_value = "20")]
         limit: u32,
     },
+    /// Start MCP server (stdio transport)
+    Mcp,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -192,6 +195,12 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 Ok::<(), anyhow::Error>(())
+            })?;
+        }
+        Some(Commands::Mcp) => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(async {
+                mcp::run().await.map_err(|e| anyhow::anyhow!("MCP server error: {e}"))
             })?;
         }
     }
