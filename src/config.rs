@@ -4,31 +4,51 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KekkaiConfig {
     #[serde(default)]
+    pub api: ApiConfig,
+    #[serde(default)]
     pub connection: ConnectionConfig,
     #[serde(default)]
     pub appearance: AppearanceConfig,
+    #[serde(default)]
+    pub favorites: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiConfig {
+    /// NordVPN server list API URL.
+    #[serde(default = "default_server_list_url")]
+    pub server_list_url: String,
+    /// Server list cache TTL in seconds.
+    #[serde(default = "default_cache_ttl")]
+    pub cache_ttl_secs: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionConfig {
-    /// Path to `nordvpn` CLI binary
+    /// Path to `nordvpn` CLI binary.
     #[serde(default = "default_nordvpn_path")]
     pub nordvpn_path: String,
-    /// Preferred protocol (NordLynx/OpenVPN)
+    /// Preferred protocol (NordLynx/OpenVPN).
     #[serde(default = "default_protocol")]
     pub protocol: String,
-    /// Preferred country code for quick-connect
+    /// Preferred country code for quick-connect.
     pub preferred_country: Option<String>,
-    /// Auto-connect on launch
+    /// Preferred city for quick-connect.
+    pub preferred_city: Option<String>,
+    /// Auto-connect on launch.
     #[serde(default)]
     pub auto_connect: bool,
-    /// Kill switch
+    /// Kill switch.
     #[serde(default = "default_killswitch")]
     pub killswitch: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppearanceConfig {
+    #[serde(default = "default_width")]
+    pub width: u32,
+    #[serde(default = "default_height")]
+    pub height: u32,
     #[serde(default = "default_bg")]
     pub background: String,
     #[serde(default = "default_fg")]
@@ -42,8 +62,19 @@ pub struct AppearanceConfig {
 impl Default for KekkaiConfig {
     fn default() -> Self {
         Self {
+            api: ApiConfig::default(),
             connection: ConnectionConfig::default(),
             appearance: AppearanceConfig::default(),
+            favorites: Vec::new(),
+        }
+    }
+}
+
+impl Default for ApiConfig {
+    fn default() -> Self {
+        Self {
+            server_list_url: default_server_list_url(),
+            cache_ttl_secs: default_cache_ttl(),
         }
     }
 }
@@ -54,6 +85,7 @@ impl Default for ConnectionConfig {
             nordvpn_path: default_nordvpn_path(),
             protocol: default_protocol(),
             preferred_country: None,
+            preferred_city: None,
             auto_connect: false,
             killswitch: default_killswitch(),
         }
@@ -63,6 +95,8 @@ impl Default for ConnectionConfig {
 impl Default for AppearanceConfig {
     fn default() -> Self {
         Self {
+            width: default_width(),
+            height: default_height(),
             background: default_bg(),
             foreground: default_fg(),
             accent: default_accent(),
@@ -71,9 +105,13 @@ impl Default for AppearanceConfig {
     }
 }
 
+fn default_server_list_url() -> String { "https://api.nordvpn.com/v1".into() }
+fn default_cache_ttl() -> u32 { 3600 }
 fn default_nordvpn_path() -> String { "nordvpn".into() }
 fn default_protocol() -> String { "NordLynx".into() }
 fn default_killswitch() -> bool { true }
+fn default_width() -> u32 { 1200 }
+fn default_height() -> u32 { 800 }
 fn default_bg() -> String { "#2e3440".into() }
 fn default_fg() -> String { "#eceff4".into() }
 fn default_accent() -> String { "#88c0d0".into() }

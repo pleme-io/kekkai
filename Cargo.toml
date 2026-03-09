@@ -41,6 +41,7 @@ shikumi = { git = "https://github.com/pleme-io/shikumi" }
 wgpu = "25"
 winit = "0.30"
 pollster = "0.4"
+glyphon = "0.9"
 
 # NordVPN API
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
