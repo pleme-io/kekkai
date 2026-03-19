@@ -18,7 +18,6 @@ mod servers;
 
 use api::VpnBackend;
 use clap::{Parser, Subcommand};
-use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(name = "kekkai", version, about = "GPU-rendered NordVPN client")]
@@ -58,25 +57,18 @@ enum Commands {
 }
 
 fn main() -> anyhow::Result<()> {
+    shidou::init_tracing();
+
     let cli = Cli::parse();
     let config = config::load(&cli.config)?;
 
     match cli.command {
         None | Some(Commands::Open) => {
-            tracing_subscriber::fmt()
-                .with_env_filter(EnvFilter::from_default_env())
-                .with_writer(std::io::stderr)
-                .init();
-
             tracing::info!("launching kekkai GUI");
             run_gui(config)?;
         }
         Some(Commands::Connect { target }) => {
-            tracing_subscriber::fmt()
-                .with_env_filter(EnvFilter::from_default_env())
-                .init();
-
-            let rt = tokio::runtime::Runtime::new()?;
+            let rt = shidou::create_runtime()?;
             rt.block_on(async {
                 let (_api, cli_backend) = api::create_backends(&config.connection.nordvpn_path);
                 let connect_target = target
@@ -104,11 +96,7 @@ fn main() -> anyhow::Result<()> {
             })?;
         }
         Some(Commands::Disconnect) => {
-            tracing_subscriber::fmt()
-                .with_env_filter(EnvFilter::from_default_env())
-                .init();
-
-            let rt = tokio::runtime::Runtime::new()?;
+            let rt = shidou::create_runtime()?;
             rt.block_on(async {
                 let (_api, cli_backend) = api::create_backends(&config.connection.nordvpn_path);
                 let mut mgr = connection::ConnectionManager::new(cli_backend);
@@ -125,11 +113,7 @@ fn main() -> anyhow::Result<()> {
             })?;
         }
         Some(Commands::Status) => {
-            tracing_subscriber::fmt()
-                .with_env_filter(EnvFilter::from_default_env())
-                .init();
-
-            let rt = tokio::runtime::Runtime::new()?;
+            let rt = shidou::create_runtime()?;
             rt.block_on(async {
                 let (_api, cli_backend) = api::create_backends(&config.connection.nordvpn_path);
                 let status = cli_backend.status().await?;
@@ -162,11 +146,7 @@ fn main() -> anyhow::Result<()> {
             })?;
         }
         Some(Commands::Servers { country, limit }) => {
-            tracing_subscriber::fmt()
-                .with_env_filter(EnvFilter::from_default_env())
-                .init();
-
-            let rt = tokio::runtime::Runtime::new()?;
+            let rt = shidou::create_runtime()?;
             rt.block_on(async {
                 let (api_backend, _cli) = api::create_backends(&config.connection.nordvpn_path);
                 let all_servers = api_backend.list_servers(limit, None).await?;
@@ -199,10 +179,9 @@ fn main() -> anyhow::Result<()> {
             })?;
         }
         Some(Commands::Mcp) => {
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(async {
-                mcp::run().await.map_err(|e| anyhow::anyhow!("MCP server error: {e}"))
-            })?;
+            shidou::block_on(mcp::run())
+                .expect("failed to create tokio runtime")
+                .map_err(|e| anyhow::anyhow!("MCP server error: {e}"))?;
         }
     }
 
